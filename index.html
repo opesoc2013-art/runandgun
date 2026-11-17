@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#090d16" />
+  <meta name="description" content="RUSH & GUN: juego de acción y plataformas 2D." />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="RUSH & GUN" />
+  <meta property="og:description" content="¡Entrá en acción y completá la misión!" />
+  <meta property="og:image" content="assets/whatsapp-preview.jpg" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="RUSH & GUN" />
+  <meta name="twitter:description" content="¡Entrá en acción y completá la misión!" />
+  <meta name="twitter:image" content="assets/whatsapp-preview.jpg" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png" />
+  <link rel="apple-touch-icon" href="assets/icon-192.png" />
+  <title>Run and Gun 2D — Diego Ferreyra</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #090d16; color: #f1f5f9;
+      font-family: system-ui, -apple-system, sans-serif;
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; min-height: 100vh;
+      padding: max(10px, env(safe-area-inset-top)) 10px max(12px, env(safe-area-inset-bottom));
+      overscroll-behavior: none;
+    }
+    .game-shell { width: min(960px, 100%); position: relative; }
+    .start-screen {
+      position: absolute; z-index: 5; top: 34px; left: 0; width: 100%;
+      aspect-ratio: 16 / 9; display: flex; flex-direction: column;
+      justify-content: flex-end; align-items: center; gap: 12px;
+      padding: 18px; border-radius: 8px; overflow: hidden;
+      background: linear-gradient(0deg, rgba(0,0,0,.88), rgba(0,0,0,.05) 70%), url("assets/portada.jpg") center 42% / cover;
+      border: 1px solid #64748b;
+    }
+    .start-screen h1 { font-size: clamp(26px, 6vw, 54px); line-height: 1; color: #fff; text-shadow: 0 3px 10px #000; letter-spacing: 2px; }
+    .start-screen p { text-align: center; font-size: clamp(11px, 2vw, 15px); text-shadow: 0 2px 6px #000; }
+    .start-screen button, .install-btn {
+      border: 0; border-radius: 999px; background: #facc15; color: #111827;
+      font-weight: 900; padding: 13px 28px; font-size: 16px; cursor: pointer;
+      box-shadow: 0 4px 18px #0009;
+    }
+    .start-screen.hidden { display: none; }
+    .mobile-controls { display: none; width: min(960px, 100%); justify-content: space-between; align-items: center; gap: 12px; margin-top: 12px; touch-action: none; user-select: none; }
+    .pad, .action-pad { display: flex; gap: 8px; align-items: center; }
+    .mobile-controls button {
+      width: clamp(48px, 13vw, 66px); height: clamp(48px, 13vw, 66px);
+      border: 1px solid #64748b; border-radius: 15px; color: white;
+      background: #263449; font-size: 22px; font-weight: 800;
+      touch-action: none; user-select: none; -webkit-user-select: none;
+    }
+    .mobile-controls button:active { background: #0e7490; transform: scale(.96); }
+    .mobile-controls .fire { background: #991b1b; }
+    .install-row { margin-top: 12px; display: flex; justify-content: center; }
+    @media (pointer: coarse), (max-width: 700px) {
+      .mobile-controls { display: flex; }
+      body { justify-content: flex-start; }
+      .hud { font-size: clamp(10px, 2.8vw, 14px); }
+      .controls { display: none; }
+      canvas { border-radius: 5px; }
+    }
+    .hud {
+      width: 100%;
+      max-width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+      font-size: 14px;
+      font-weight: 600;
+    }
+    canvas {
+      width: 100%;
+      max-width: 100%;
+      height: auto;
+      aspect-ratio: 16 / 9;
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      display: block;
+    }
+    .controls {
+      margin-top: 10px;
+      font-size: 13px;
+      color: #94a3b8;
+    }
+  </style>
+</head>
+<body>
+  <main class="game-shell">
+  <div class="hud">
+    <span id="hud-score">Puntaje: 0</span>
+    <span id="hud-hp">Vida: 5 / 5</span>
+    <span id="hud-enemies">Enemigos: 5</span>
+  </div>
+
+  <canvas id="gameCanvas" width="960" height="540"></canvas>
+  <section class="start-screen" id="startScreen">
+    <h1>RUSH &amp; GUN</h1>
+    <p>Acción clásica • Plataformas • ¡Completá la misión!</p>
+    <button id="startButton" type="button">JUGAR</button>
+  </section>
+
+  <p class="controls">
+    Controles: Flechas (mover / apuntar arriba / agacharse) · Z (Saltar) · X (Disparar) · R (Reiniciar)
+  </p>
+  </main>
+  <div class="mobile-controls" aria-label="Controles táctiles">
+    <div class="pad">
+      <button type="button" data-key="ArrowLeft" aria-label="Izquierda">◀</button>
+      <button type="button" data-key="ArrowRight" aria-label="Derecha">▶</button>
+      <button type="button" data-key="ArrowUp" aria-label="Apuntar arriba">▲</button>
+      <button type="button" data-key="ArrowDown" aria-label="Agacharse o apuntar abajo">▼</button>
+    </div>
+    <div class="action-pad">
+      <button type="button" data-key="KeyZ" aria-label="Saltar">Z</button>
+      <button type="button" class="fire" data-key="KeyX" aria-label="Disparar">X</button>
+    </div>
+  </div>
+  <div class="install-row"><button class="install-btn" id="installButton" type="button" hidden>Instalar juego</button></div>
+
+  <script>
+    // =========================================================================
+    // 1. CONFIGURACIÓN INICIAL DEL LIENZO Y CONSTANTES FÍSICAS
+    // =========================================================================
+    let juegoIniciado = false;
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+
+    const GRAVEDAD = 1500;
+    const VELOCIDAD_MOVIMIENTO = 265;
+    const FUERZA_SALTO = -610;
+    const VELOCIDAD_BALA = 740;
+    const CADENCIA_DISPARO = 0.15;
+    const ANCHO_MUNDO = 2200;
+
+    // =========================================================================
+    // 2. GESTIÓN DE ENTRADA (TECLADO)
+    // =========================================================================
+    const teclas = {};
+    let saltoPresionado = false;
+
+    window.addEventListener("keydown", (e) => {
+      if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space"].includes(e.code)) {
+        e.preventDefault();
+      }
+      if (e.code === "KeyZ" && !teclas[e.code]) {
+        saltoPresionado = true;
+      }
+      if (e.code === "KeyR") {
+        reiniciarJuego();
+        juegoIniciado = true;
+        document.getElementById("startScreen").classList.add("hidden");
+      }
+      teclas[e.code] = true;
+    });
+
+    window.addEventListener("keyup", (e) => {
+      teclas[e.code] = false;
+    });
+
+    // =========================================================================
+    // 3. ENTIDADES: JUGADOR, PLATAFORMAS SÓLIDAS, ENEMIGOS Y PROYECTILES
+    // =========================================================================
+    let jugador, plataformas, enemigos, balas, particulas, camaraX, puntaje, estadoJuego;
+
+    function reiniciarJuego() {
+      jugador = {
+        x: 80,
+        y: 380,
+        ancho: 30,
+        alto: 48,
+        altoNormal: 48,
+        altoAgachado: 28,
+        vx: 0,
+        vy: 0,
+        mirando: 1, // 1 = derecha, -1 = izquierda
+        enSuelo: false,
+        agachado: false,
+        apuntaX: 1,
+        apuntaY: 0,
+        vida: 5,
+        invulnerable: 0,
+        cooldownDisparo: 0,
+        animacion: 0
+      };
+
+      // Plataformas sólidas (x, y, ancho, alto)
+      plataformas = [
+        { x: 0, y: 470, ancho: 950, alto: 70 },
+        { x: 1050, y: 470, ancho: 1150, alto: 70 },
+        { x: 260, y: 380, ancho: 160, alto: 22 },
+        { x: 480, y: 300, ancho: 180, alto: 22 },
+        { x: 740, y: 375, ancho: 160, alto: 22 },
+        { x: 930, y: 390, ancho: 140, alto: 20 },
+        { x: 1220, y: 375, ancho: 180, alto: 22 },
+        { x: 1480, y: 295, ancho: 190, alto: 22 },
+        { x: 1760, y: 375, ancho: 180, alto: 22 }
+      ];
+
+      // Enemigos patrullando con límites de patrulla y puntos de vida
+      enemigos = [
+        { x: 440, y: 424, ancho: 30, alto: 46, vx: 80, minX: 320, maxX: 600, vida: 2, flash: 0, activo: true },
+        { x: 520, y: 254, ancho: 30, alto: 46, vx: -70, minX: 485, maxX: 625, vida: 2, flash: 0, activo: true },
+        { x: 1180, y: 424, ancho: 30, alto: 46, vx: 95, minX: 1080, maxX: 1380, vida: 3, flash: 0, activo: true },
+        { x: 1520, y: 249, ancho: 30, alto: 46, vx: 75, minX: 1485, maxX: 1635, vida: 2, flash: 0, activo: true },
+        { x: 1820, y: 424, ancho: 30, alto: 46, vx: -100, minX: 1650, maxX: 2050, vida: 3, flash: 0, activo: true }
+      ];
+
+      balas = [];
+      particulas = [];
+      camaraX = 0;
+      puntaje = 0;
+      estadoJuego = "JUGANDO";
+    }
+
+    function colisionAABB(ax, ay, aw, ah, bx, by, bw, bh) {
+      return ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by;
+    }
+
+    function crearExplosion(x, y, color, cantidad) {
+      for (let i = 0; i < cantidad; i++) {
+        const angulo = Math.random() * Math.PI * 2;
+        const vel = 60 + Math.random() * 190;
+        particulas.push({
+          x, y,
+          vx: Math.cos(angulo) * vel,
+          vy: Math.sin(angulo) * vel - 40,
+          vida: 0.35 + Math.random() * 0.25,
+          color
+        });
+      }
+    }
+
+    // =========================================================================
+    // 4. ACTUALIZACIÓN DE LÓGICA Y FÍSICA
+    // =========================================================================
+    function actualizar(dt) {
+      if (!juegoIniciado || estadoJuego !== "JUGANDO") return;
+
+      jugador.invulnerable = Math.max(0, jugador.invulnerable - dt);
+      jugador.cooldownDisparo = Math.max(0, jugador.cooldownDisparo - dt);
+
+      // Movimiento horizontal con flechas izquierda/derecha
+      const dirX = (teclas["ArrowRight"] ? 1 : 0) - (teclas["ArrowLeft"] ? 1 : 0);
+      if (dirX !== 0) jugador.mirando = dirX;
+
+      // Agacharse con flecha abajo
+      const quiereAgacharse = Boolean(teclas["ArrowDown"] && jugador.enSuelo);
+      if (quiereAgacharse && !jugador.agachado) {
+        jugador.agachado = true;
+        jugador.y += jugador.altoNormal - jugador.altoAgachado;
+        jugador.alto = jugador.altoAgachado;
+      } else if (!quiereAgacharse && jugador.agachado) {
+        jugador.agachado = false;
+        jugador.y -= jugador.altoNormal - jugador.altoAgachado;
+        jugador.alto = jugador.altoNormal;
+      }
+
+      jugador.vx = dirX * (jugador.agachado ? 110 : VELOCIDAD_MOVIMIENTO);
+      if (dirX !== 0 && jugador.enSuelo) jugador.animacion += dt * 10;
+
+      // Salto con tecla Z
+      if (saltoPresionado && jugador.enSuelo) {
+        jugador.vy = FUERZA_SALTO;
+        jugador.enSuelo = false;
+      }
+      saltoPresionado = false;
+
+      // Aplicar gravedad
+      jugador.vy = Math.min(760, jugador.vy + GRAVEDAD * dt);
+
+      // Mover en X y resolver colisiones sólidas
+      jugador.x += jugador.vx * dt;
+      jugador.x = Math.max(0, Math.min(jugador.x, ANCHO_MUNDO - jugador.ancho));
+      for (const p of plataformas) {
+        if (colisionAABB(jugador.x, jugador.y, jugador.ancho, jugador.alto, p.x, p.y, p.ancho, p.alto)) {
+          jugador.x = jugador.vx > 0 ? p.x - jugador.ancho : p.x + p.ancho;
+        }
+      }
+
+      // Mover en Y y resolver colisiones sólidas (suelo y techos)
+      jugador.y += jugador.vy * dt;
+      jugador.enSuelo = false;
+      for (const p of plataformas) {
+        if (colisionAABB(jugador.x, jugador.y, jugador.ancho, jugador.alto, p.x, p.y, p.ancho, p.alto)) {
+          if (jugador.vy > 0) {
+            jugador.y = p.y - jugador.alto;
+            jugador.vy = 0;
+            jugador.enSuelo = true;
+          } else if (jugador.vy < 0) {
+            jugador.y = p.y + p.alto;
+            jugador.vy = 0;
+          }
+        }
+      }
+
+      // Apuntado hacia adelante o en diagonal (corriendo o quieto)
+      if (jugador.agachado) {
+        jugador.apuntaX = jugador.mirando;
+        jugador.apuntaY = 0;
+      } else if (teclas["ArrowUp"]) {
+        if (dirX !== 0) {
+          jugador.apuntaX = dirX * Math.SQRT1_2;
+          jugador.apuntaY = -Math.SQRT1_2;
+        } else {
+          jugador.apuntaX = 0;
+          jugador.apuntaY = -1;
+        }
+      } else if (teclas["ArrowDown"] && !jugador.enSuelo) {
+        if (dirX !== 0) {
+          jugador.apuntaX = dirX * Math.SQRT1_2;
+          jugador.apuntaY = Math.SQRT1_2;
+        } else {
+          jugador.apuntaX = 0;
+          jugador.apuntaY = 1;
+        }
+      } else {
+        jugador.apuntaX = jugador.mirando;
+        jugador.apuntaY = 0;
+      }
+
+      // Sistema de disparo con tecla X
+      if (teclas["KeyX"] && jugador.cooldownDisparo <= 0) {
+        const origenX = jugador.x + jugador.ancho / 2 + jugador.apuntaX * 20;
+        const origenY = jugador.y + (jugador.agachado ? 12 : 20) + jugador.apuntaY * 20;
+        balas.push({
+          x: origenX,
+          y: origenY,
+          vx: jugador.apuntaX * VELOCIDAD_BALA,
+          vy: jugador.apuntaY * VELOCIDAD_BALA,
+          activa: true
+        });
+        jugador.cooldownDisparo = CADENCIA_DISPARO;
+      }
+
+      // Actualizar enemigos patrullando
+      for (const e of enemigos) {
+        if (!e.activo) continue;
+        e.flash = Math.max(0, e.flash - dt);
+        e.x += e.vx * dt;
+        if (e.x <= e.minX) { e.x = e.minX; e.vx = Math.abs(e.vx); }
+        if (e.x >= e.maxX) { e.x = e.maxX; e.vx = -Math.abs(e.vx); }
+
+        if (jugador.invulnerable <= 0 && colisionAABB(jugador.x, jugador.y, jugador.ancho, jugador.alto, e.x, e.y, e.ancho, e.alto)) {
+          jugador.vida -= 1;
+          jugador.invulnerable = 1.2;
+          if (jugador.vida <= 0) estadoJuego = "DERROTA";
+        }
+      }
+
+      // Actualizar balas y colisiones
+      for (const b of balas) {
+        if (!b.activa) continue;
+        b.x += b.vx * dt;
+        b.y += b.vy * dt;
+
+        if (b.x < camaraX - 50 || b.x > camaraX + canvas.width + 50 || b.y < -50 || b.y > canvas.height + 50) {
+          b.activa = false;
+          continue;
+        }
+
+        for (const e of enemigos) {
+          if (e.activo && colisionAABB(b.x - 4, b.y - 4, 8, 8, e.x, e.y, e.ancho, e.alto)) {
+            b.activa = false;
+            e.vida -= 1;
+            e.flash = 0.1;
+            crearExplosion(b.x, b.y, "#fde047", 5);
+            if (e.vida <= 0) {
+              e.activo = false;
+              puntaje += 100;
+              crearExplosion(e.x + 15, e.y + 23, "#ef4444", 16);
+            }
+            break;
+          }
+        }
+      }
+      balas = balas.filter((b) => b.activa);
+
+      // Partículas
+      for (const pt of particulas) {
+        pt.vy += 480 * dt;
+        pt.x += pt.vx * dt;
+        pt.y += pt.vy * dt;
+        pt.vida -= dt;
+      }
+      particulas = particulas.filter((pt) => pt.vida > 0);
+
+      // Cámara suave
+      const objetivoCam = Math.max(0, Math.min(jugador.x - canvas.width * 0.35, ANCHO_MUNDO - canvas.width));
+      camaraX += (objetivoCam - camaraX) * Math.min(1, dt * 8);
+
+      // Actualizar HUD
+      const vivos = enemigos.filter((e) => e.activo).length;
+      document.getElementById("hud-score").textContent = "Puntaje: " + puntaje;
+      document.getElementById("hud-hp").textContent = "Vida: " + jugador.vida + " / 5";
+      document.getElementById("hud-enemies").textContent = "Enemigos: " + vivos;
+
+      if (vivos === 0) estadoJuego = "VICTORIA";
+    }
+
+    // =========================================================================
+    // 5. RENDERIZADO EN CANVAS 2D
+    // =========================================================================
+    function dibujar() {
+      ctx.fillStyle = "#0f172a";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Plataformas
+      for (const p of plataformas) {
+        const px = p.x - camaraX;
+        ctx.fillStyle = "#334155";
+        ctx.fillRect(px, p.y, p.ancho, p.alto);
+        ctx.fillStyle = "#10b981";
+        ctx.fillRect(px, p.y, p.ancho, 4);
+      }
+
+      // Enemigos patrullando
+      for (const e of enemigos) {
+        if (!e.activo) continue;
+        const ex = e.x - camaraX;
+        ctx.fillStyle = e.flash > 0 ? "#ffffff" : "#dc2626";
+        ctx.fillRect(ex, e.y + 12, e.ancho, e.alto - 12);
+        ctx.fillStyle = e.flash > 0 ? "#ffffff" : "#475569";
+        ctx.fillRect(ex + 5, e.y, 20, 12);
+      }
+
+      // Protagonista: Remera AZUL con FRANJA AMARILLA en el medio
+      if (jugador.invulnerable <= 0 || Math.floor(jugador.invulnerable * 15) % 2 === 0) {
+        const jx = jugador.x - camaraX;
+        const jy = jugador.y;
+
+        // Piernas
+        ctx.fillStyle = "#1e293b";
+        ctx.fillRect(jx + 6, jy + (jugador.agachado ? 18 : 32), 7, jugador.agachado ? 10 : 16);
+        ctx.fillRect(jx + 17, jy + (jugador.agachado ? 18 : 32), 7, jugador.agachado ? 10 : 16);
+
+        // Remera azul
+        ctx.fillStyle = "#2563eb";
+        ctx.fillRect(jx + 4, jy + (jugador.agachado ? 8 : 14), 22, jugador.agachado ? 12 : 18);
+
+        // Franja amarilla en el medio de la remera
+        ctx.fillStyle = "#facc15";
+        ctx.fillRect(jx + 4, jy + (jugador.agachado ? 12 : 21), 22, 4);
+
+        // Cabeza y vincha roja
+        ctx.fillStyle = "#f1c27d";
+        ctx.fillRect(jx + 8, jy + (jugador.agachado ? -2 : 1), 14, 12);
+        ctx.fillStyle = "#dc2626";
+        ctx.fillRect(jx + 7, jy + (jugador.agachado ? 0 : 4), 16, 4);
+
+        // Rifle apuntando en dirección del disparo
+        ctx.save();
+        ctx.translate(jx + jugador.ancho / 2, jy + (jugador.agachado ? 13 : 20));
+        ctx.rotate(Math.atan2(jugador.apuntaY, jugador.apuntaX));
+        ctx.fillStyle = "#94a3b8";
+        ctx.fillRect(4, -2, 20, 4);
+        ctx.restore();
+      }
+
+      // Balas
+      ctx.fillStyle = "#fde047";
+      for (const b of balas) {
+        ctx.beginPath();
+        ctx.arc(b.x - camaraX, b.y, 4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Partículas
+      for (const pt of particulas) {
+        ctx.fillStyle = pt.color;
+        ctx.fillRect(pt.x - camaraX, pt.y, 4, 4);
+      }
+
+      // Marca de agua en la parte inferior izquierda: "Diego Ferreyra"
+      ctx.save();
+      ctx.font = "600 14px system-ui, sans-serif";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "bottom";
+      ctx.fillStyle = "rgba(255, 255, 255, 0.5)";
+      ctx.fillText("Diego Ferreyra", 16, canvas.height - 14);
+      ctx.restore();
+
+      // Pantalla de Victoria o Derrota
+      if (estadoJuego !== "JUGANDO") {
+        ctx.fillStyle = "rgba(9, 13, 22, 0.72)";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "bold 36px system-ui, sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText(
+          estadoJuego === "VICTORIA" ? "¡MISIÓN CUMPLIDA!" : "FIN DEL JUEGO",
+          canvas.width / 2,
+          canvas.height / 2 - 12
+        );
+        ctx.font = "16px system-ui, sans-serif";
+        ctx.fillStyle = "#cbd5e1";
+        ctx.fillText("Presiona 'R' para reiniciar", canvas.width / 2, canvas.height / 2 + 24);
+      }
+    }
+
+    // =========================================================================
+    // 6. BUCLE PRINCIPAL (60 FPS)
+    // =========================================================================
+    let ultimoTiempo = performance.now();
+    function bucle(ahora) {
+      const dt = Math.min((ahora - ultimoTiempo) / 1000, 0.033);
+      ultimoTiempo = ahora;
+      actualizar(dt);
+      dibujar();
+      requestAnimationFrame(bucle);
+    }
+
+    reiniciarJuego();
+    requestAnimationFrame(bucle);
+  </script>
+
+  <script>
+    const startScreen = document.getElementById("startScreen");
+    document.getElementById("startButton").addEventListener("click", () => {
+      juegoIniciado = true;
+      startScreen.classList.add("hidden");
+    });
+
+    // Botones táctiles: mantienen las mismas teclas que el juego de escritorio.
+    document.querySelectorAll(".mobile-controls [data-key]").forEach((button) => {
+      const code = button.dataset.key;
+      const press = (event) => {
+        event.preventDefault();
+        if (code === "KeyZ" && !teclas[code]) saltoPresionado = true;
+        teclas[code] = true;
+      };
+      const release = (event) => {
+        event.preventDefault();
+        teclas[code] = false;
+      };
+      button.addEventListener("pointerdown", press);
+      button.addEventListener("pointerup", release);
+      button.addEventListener("pointercancel", release);
+      button.addEventListener("pointerleave", release);
+      button.addEventListener("contextmenu", (event) => event.preventDefault());
+    });
+
+    let deferredInstallPrompt = null;
+    const installButton = document.getElementById("installButton");
+    window.addEventListener("beforeinstallprompt", (event) => {
+      event.preventDefault();
+      deferredInstallPrompt = event;
+      installButton.hidden = false;
+    });
+    installButton.addEventListener("click", async () => {
+      if (!deferredInstallPrompt) return;
+      deferredInstallPrompt.prompt();
+      await deferredInstallPrompt.userChoice;
+      deferredInstallPrompt = null;
+      installButton.hidden = true;
+    });
+
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("./sw.js").catch((err) => console.warn("No se pudo registrar el service worker:", err));
+      });
+    }
+  </script>
+
+</body>
+</html>
